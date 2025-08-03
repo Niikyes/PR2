@@ -35,28 +35,28 @@ jobs:
           source: "docker-compose.yml"
           target: "~/PR2"
 
-      # Generar archivo .env
+      # Generar archivo .env en el runner
       - name: Generate .env file
         run: |
-          echo "DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}" > .env.prod
-          echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env.prod
-          echo "DB_USER=${{ secrets.DB_USER }}" >> .env.prod
-          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env.prod
-          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env.prod
-          echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env.prod
+          echo "DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}" > .env
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env
+          echo "DB_USER=${{ secrets.DB_USER }}" >> .env
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+          echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
 
-      # Subir .env a EC2
-      - name: Copy .env to EC2
+      # Subir el archivo .env a EC2
+      - name: Upload .env to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_KEY }}
-          source: ".env.prod"
+          source: ".env"
           target: "~/PR2/.env"
 
-      # Verificar existencia de .env en EC2 (sin mostrar contenido)
-      - name: Verify .env exists on EC2
+      # Validar existencia de .env en EC2
+      - name: Verify .env on EC2
         uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -64,14 +64,13 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             if [ -f ~/PR2/.env ]; then
-              echo ".env encontrado en ~/PR2"
-              ls -lh ~/PR2/.env
+              echo ".env encontrado correctamente en ~/PR2"
             else
-              echo "ERROR: El archivo .env no existe en ~/PR2"
+              echo "ERROR: .env no se encuentra en ~/PR2"
               exit 1
             fi
 
-      # Desplegar contenedores usando docker-compose
+      # Desplegar en EC2
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.10
         with:
@@ -88,6 +87,7 @@ jobs:
             sudo docker-compose down --rmi all --volumes --remove-orphans || true
             sudo docker-compose --env-file .env pull
             sudo docker-compose --env-file .env up -d
+
 
 
 
