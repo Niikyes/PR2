@@ -9,12 +9,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1️⃣ Checkout del repositorio
       - name: Checkout repo
         uses: actions/checkout@v3
 
+      # 2️⃣ Login en DockerHub
       - name: Log in to DockerHub
         run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
+      # 3️⃣ Build y push de imágenes
       - name: Build and push backend image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend-app ./backend
@@ -25,17 +28,7 @@ jobs:
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app ./frontend
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app
 
-      # Copiar docker-compose.yml a EC2
-      - name: Copy docker-compose.yml to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_KEY }}
-          source: "docker-compose.yml"
-          target: "~/PR2"
-
-      # Generar archivo .env en el runner
+      # 4️⃣ Generar archivo .env
       - name: Generate .env file
         run: |
           echo "DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}" > .env
@@ -45,7 +38,7 @@ jobs:
           echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
           echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
 
-      # Subir el archivo .env a EC2
+      # 5️⃣ Subir archivo .env a EC2
       - name: Upload .env to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -53,24 +46,9 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_KEY }}
           source: ".env"
-          target: "~/PR2/.env"
+          target: "/home/ubuntu/PR2/.env"
 
-      # Validar existencia de .env en EC2
-      - name: Verify .env on EC2
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            if [ -f ~/PR2/.env ]; then
-              echo ".env encontrado correctamente en ~/PR2"
-            else
-              echo "ERROR: .env no se encuentra en ~/PR2"
-              exit 1
-            fi
-
-      # Desplegar en EC2
+      # 6️⃣ Deploy en EC2
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.10
         with:
@@ -83,16 +61,18 @@ jobs:
               sudo apt install -y docker-compose
             fi
 
+            # Verificar que el archivo .env existe
+            if [ ! -f /home/ubuntu/PR2/.env ]; then
+              echo "ERROR: .env no encontrado en /home/ubuntu/PR2"
+              exit 1
+            fi
+
             cd ~/PR2
+
+            # Detener y limpiar contenedores previos
             sudo docker-compose down --rmi all --volumes --remove-orphans || true
+
+            # Descargar imágenes y levantar contenedores con el .env
             sudo docker-compose --env-file .env pull
             sudo docker-compose --env-file .env up -d
-
-
-
-
-
-
-
-
-
+ 
