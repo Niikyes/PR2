@@ -8,6 +8,8 @@
   <h1>😂 Tu chiste de programación</h1>
   <p id="joke">Cargando chiste...</p>
 
+  <button onclick="window.location.href='index.html'">⬅ Volver</button>
+
   <script>
     fetch('http://54.172.213.164:8080/api/joke')
       .then(response => response.json())
@@ -23,3 +25,4 @@
   </script>
 </body>
 </html>
+
