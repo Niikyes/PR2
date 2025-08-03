@@ -2,34 +2,33 @@ name: CI/CD to EC2
 
 on:
   push:
-    branches: ["test1"]  # Cambia a "main" cuando lo pases a producción
+    branches: ["test1"] # Cambia a main cuando pase a prod
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Obtener el código del repo
+      # 1. Checkout del repo
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      # 2. Log in a DockerHub
+      # 2. Login en DockerHub
       - name: Log in to DockerHub
         run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-      # 3. Construir y publicar imagen de backend
+      # 3. Construir y publicar imágenes
       - name: Build and push backend image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend-app ./backend
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend-app
 
-      # 4. Construir y publicar imagen de frontend
       - name: Build and push frontend image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app ./frontend
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app
 
-      # 5. Copiar docker-compose.yml al servidor EC2
+      # 4. Copiar docker-compose.yml a EC2
       - name: Copy docker-compose.yml to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -39,6 +38,26 @@ jobs:
           source: "docker-compose.yml"
           target: "~/PR2"
 
+      # 5. Crear y transferir .env dinámico a EC2
+      - name: Generate and copy .env to EC2
+        run: |
+          echo "DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}" > .env.prod
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env.prod
+          echo "DB_USER=${{ secrets.DB_USER }}" >> .env.prod
+          echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env.prod
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env.prod
+          echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env.prod
+
+        # Transferencia del archivo .env generado
+      - name: Upload .env.prod to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          source: ".env.prod"
+          target: "~/PR2/.env"
+
       # 6. Desplegar en EC2
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.10
@@ -46,34 +65,17 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_KEY }}
-          envs: DB_HOST,DB_USER,DB_PASSWORD,DB_NAME,DB_PORT,DOCKERHUB_USERNAME
           script: |
-            # Instalar docker-compose si no existe
-            if ! command -v docker-compose &> /dev/null
-            then
+            if ! command -v docker-compose &> /dev/null; then
               sudo apt update
               sudo apt install -y docker-compose
             fi
 
-            # Exportar variables desde secrets
-            export DB_HOST=${DB_HOST}
-            export DB_USER=${DB_USER}
-            export DB_PASSWORD=${DB_PASSWORD}
-            export DB_NAME=${DB_NAME}
-            export DB_PORT=${DB_PORT}
-            export DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME}
-
-            # Ir al directorio de despliegue
             cd ~/PR2
-
-            # Detener y limpiar contenedores previos
             sudo docker-compose down --rmi all --volumes --remove-orphans || true
+            sudo docker-compose --env-file .env pull
+            sudo docker-compose --env-file .env up -d
 
-            # Descargar imágenes actualizadas desde DockerHub
-            sudo docker-compose pull
-
-            # Levantar los nuevos contenedores
-            sudo docker-compose up -d
 
 
 
