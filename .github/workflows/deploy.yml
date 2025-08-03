@@ -13,17 +13,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Test SSH Connection
-        uses: appleboy/ssh-action@v0.1.10
+      # 1️⃣ Copiar archivo .env a EC2
+      - name: Copiar archivo .env a EC2
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_KEY }}
-          script: |
-            echo "Conexión SSH exitosa"
-            whoami
-            uname -a
+          source: "backend/.env"
+          target: "/home/ubuntu/PR2/backend/"
 
+      # 2️⃣ Ejecutar despliegue
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.10
         with:
@@ -42,7 +42,7 @@ jobs:
             fi
 
             if [ ! -f "/home/ubuntu/PR2/backend/.env" ]; then
-              echo "ERROR: El archivo /backend/.env no existe en /home/ubuntu/PR2."
+              echo "ERROR: El archivo backend/.env no existe en EC2."
               exit 1
             fi
 
