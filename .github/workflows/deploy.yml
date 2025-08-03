@@ -28,7 +28,7 @@ jobs:
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app ./frontend
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app
 
-      # 4️⃣ Generar archivo .env
+      # 4️⃣ Generar archivo .env localmente
       - name: Generate .env file
         run: |
           echo "DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}" > .env
@@ -38,7 +38,7 @@ jobs:
           echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
           echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
 
-      # 5️⃣ Subir archivo .env a EC2
+      # 5️⃣ Subir el archivo .env a EC2
       - name: Upload .env to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -48,7 +48,7 @@ jobs:
           source: ".env"
           target: "/home/ubuntu/PR2/.env"
 
-      # 6️⃣ Deploy en EC2
+      # 6️⃣ Desplegar en EC2
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.10
         with:
@@ -61,18 +61,14 @@ jobs:
               sudo apt install -y docker-compose
             fi
 
-            # Verificar que el archivo .env existe
             if [ ! -f /home/ubuntu/PR2/.env ]; then
               echo "ERROR: .env no encontrado en /home/ubuntu/PR2"
               exit 1
             fi
 
             cd ~/PR2
-
-            # Detener y limpiar contenedores previos
             sudo docker-compose down --rmi all --volumes --remove-orphans || true
-
-            # Descargar imágenes y levantar contenedores con el .env
             sudo docker-compose --env-file .env pull
             sudo docker-compose --env-file .env up -d
+
  
