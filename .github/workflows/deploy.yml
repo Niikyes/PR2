@@ -2,7 +2,7 @@ name: CI/CD to EC2
 
 on:
   push:
-    branches: ["test"]
+    branches: ["test1"]
 
 jobs:
   deploy:
@@ -39,36 +39,24 @@ jobs:
               sudo apt install -y docker-compose
             fi
 
-            mkdir -p ~/PR2
+            # Descargar el repo en EC2 (solo para usar el docker-compose.yml)
+            rm -rf ~/PR2
+            git clone https://github.com/${GITHUB_REPOSITORY}.git ~/PR2
 
-            # Eliminar contenedores, imágenes y volúmenes viejos
-            sudo docker-compose -f ~/PR2/docker-compose.yml down --rmi all --volumes --remove-orphans || true
+            # Exportar variables desde Secrets
+            export DB_HOST=${{ secrets.DB_HOST }}
+            export DB_USER=${{ secrets.DB_USER }}
+            export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            export DB_NAME=${{ secrets.DB_NAME }}
+            export DB_PORT=${{ secrets.DB_PORT }}
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
 
-            # Crear docker-compose.yml actualizado con valores inyectados
-            cat > ~/PR2/docker-compose.yml <<EOF
-            version: '3.8'
-            services:
-              backend:
-                image: ${{ secrets.DOCKERHUB_USERNAME }}/backend-app:latest
-                container_name: backend_app
-                ports:
-                  - "8080:8080"
-                environment:
-                  - DB_HOST=${{ secrets.DB_HOST }}
-                  - DB_USER=${{ secrets.DB_USER }}
-                  - DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-                  - DB_NAME=${{ secrets.DB_NAME }}
-                  - DB_PORT=${{ secrets.DB_PORT }}
-              frontend:
-                image: ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app:latest
-                container_name: frontend_app
-                ports:
-                  - "80:80"
-            EOF
-
+            # Ir al repo y desplegar con el docker-compose del repo
             cd ~/PR2
+            sudo docker-compose down --rmi all --volumes --remove-orphans || true
             sudo docker-compose pull
             sudo docker-compose up -d
+
 
 
 
