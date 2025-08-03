@@ -3,7 +3,7 @@ name: Deploy to EC2
 on:
   push:
     branches:
-      - test1 
+      - test1  # Rama de despliegue
 
 jobs:
   deploy:
@@ -37,6 +37,7 @@ jobs:
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
             DB_NAME=${{ secrets.DB_NAME }}
             DB_PORT=${{ secrets.DB_PORT }}
+            DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             EOF
 
             # 4️⃣ Ir a PR2 y levantar contenedores
@@ -44,6 +45,7 @@ jobs:
             sudo docker-compose down --rmi all --volumes --remove-orphans || true
             sudo docker-compose --env-file backend/.env pull
             sudo docker-compose --env-file backend/.env up -d
+
 
 
 
