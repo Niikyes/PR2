@@ -2,7 +2,7 @@ name: CI/CD to EC2
 
 on:
   push:
-    branches: ["test1"] # Cambia a main cuando pase a prod
+    branches: ["test1"]
 
 jobs:
   deploy:
@@ -17,7 +17,7 @@ jobs:
       - name: Log in to DockerHub
         run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-      # 3. Construir y publicar imágenes
+      # 3. Build y push de imágenes
       - name: Build and push backend image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend-app ./backend
@@ -38,8 +38,8 @@ jobs:
           source: "docker-compose.yml"
           target: "~/PR2"
 
-      # 5. Crear y transferir .env dinámico a EC2
-      - name: Generate and copy .env to EC2
+      # 5. Generar archivo .env desde los Secrets
+      - name: Generate .env file
         run: |
           echo "DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}" > .env.prod
           echo "DB_HOST=${{ secrets.DB_HOST }}" >> .env.prod
@@ -48,8 +48,8 @@ jobs:
           echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env.prod
           echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env.prod
 
-        # Transferencia del archivo .env generado
-      - name: Upload .env.prod to EC2
+      # 6. Copiar el .env generado a EC2
+      - name: Copy .env to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -58,7 +58,7 @@ jobs:
           source: ".env.prod"
           target: "~/PR2/.env"
 
-      # 6. Desplegar en EC2
+      # 7. Desplegar en EC2 usando el .env
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.10
         with:
@@ -75,6 +75,7 @@ jobs:
             sudo docker-compose down --rmi all --volumes --remove-orphans || true
             sudo docker-compose --env-file .env pull
             sudo docker-compose --env-file .env up -d
+
 
 
 
