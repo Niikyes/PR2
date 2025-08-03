@@ -13,20 +13,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Test SSH Connection
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            echo "Conexión SSH exitosa"
+            whoami
+            uname -a
+
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
+          username: ubuntu
           key: ${{ secrets.EC2_KEY }}
           script: |
-            # Instalar docker-compose si no existe
             if ! command -v docker-compose &> /dev/null; then
               sudo apt update
               sudo apt install -y docker-compose
             fi
 
-            # Verificar que el directorio PR2 y el archivo .env existen
             if [ ! -d "/home/ubuntu/PR2" ]; then
               echo "ERROR: El directorio /home/ubuntu/PR2 no existe en la instancia EC2."
               exit 1
@@ -37,15 +46,11 @@ jobs:
               exit 1
             fi
 
-            # Entrar al directorio del proyecto
             cd ~/PR2
-
-            # Detener y eliminar contenedores anteriores
             sudo docker-compose down --rmi all --volumes --remove-orphans || true
-
-            # Descargar imágenes actualizadas y levantar contenedores
             sudo docker-compose --env-file backend/.env pull
             sudo docker-compose --env-file backend/.env up -d
+
 
 
  
