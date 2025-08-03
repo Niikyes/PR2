@@ -13,7 +13,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 1️⃣ Copiar archivo .env a EC2
+      # 1️⃣ Crear el directorio backend y copiar el .env
+      - name: Crear directorio backend y copiar .env a EC2
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            mkdir -p /home/ubuntu/PR2/backend
+
       - name: Copiar archivo .env a EC2
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -23,7 +32,7 @@ jobs:
           source: "backend/.env"
           target: "/home/ubuntu/PR2/backend/"
 
-      # 2️⃣ Ejecutar despliegue
+      # 2️⃣ Desplegar con docker-compose
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.10
         with:
@@ -36,20 +45,16 @@ jobs:
               sudo apt install -y docker-compose
             fi
 
-            if [ ! -d "/home/ubuntu/PR2" ]; then
-              echo "ERROR: El directorio /home/ubuntu/PR2 no existe en la instancia EC2."
-              exit 1
-            fi
-
-            if [ ! -f "/home/ubuntu/PR2/backend/.env" ]; then
+            cd ~/PR2
+            if [ ! -f "backend/.env" ]; then
               echo "ERROR: El archivo backend/.env no existe en EC2."
               exit 1
             fi
 
-            cd ~/PR2
             sudo docker-compose down --rmi all --volumes --remove-orphans || true
             sudo docker-compose --env-file backend/.env pull
             sudo docker-compose --env-file backend/.env up -d
+
 
 
 
