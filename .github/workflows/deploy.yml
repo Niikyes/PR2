@@ -2,29 +2,34 @@ name: CI/CD to EC2
 
 on:
   push:
-    branches: ["test"]
+    branches: ["test"]  # Se ejecuta solo en la rama test
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      #Descargar el código del repositorio
       - name: Checkout repo
         uses: actions/checkout@v3
 
+      #Loguearse en DockerHub
       - name: Log in to DockerHub
         run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
+      #Construir y subir imagen backend
       - name: Build and push backend image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend-app ./backend
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend-app
 
+      #Construir y subir imagen frontend
       - name: Build and push frontend image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app ./frontend
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app
 
+      #Conectarse a EC2, generar docker-compose.yml y desplegar
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.10
         with:
@@ -46,7 +51,7 @@ jobs:
             version: '3.8'
             services:
               backend:
-                image: ${DOCKERHUB_USERNAME}/backend-app:latest
+                image: ${{ secrets.DOCKERHUB_USERNAME }}/backend-app:latest
                 container_name: backend_app
                 ports:
                   - "8080:8080"
@@ -57,7 +62,7 @@ jobs:
                   - DB_NAME=${{ secrets.DB_NAME }}
                   - DB_PORT=${{ secrets.DB_PORT }}
               frontend:
-                image: ${DOCKERHUB_USERNAME}/frontend-app:latest
+                image: ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app:latest
                 container_name: frontend_app
                 ports:
                   - "80:80"
@@ -66,4 +71,7 @@ jobs:
             cd ~/PR2
             sudo docker-compose pull
             sudo docker-compose up -d
+
+            # Verificar contenedores en ejecución
+            sudo docker ps
 
