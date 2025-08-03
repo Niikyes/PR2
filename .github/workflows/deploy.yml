@@ -2,35 +2,51 @@ name: CI/CD to EC2
 
 on:
   push:
-    branches: ["test1"]
+    branches: ["test1"]  # Cambia a "main" cuando lo pases a producción
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Obtener el código del repo
       - name: Checkout repo
         uses: actions/checkout@v3
 
+      # 2. Log in a DockerHub
       - name: Log in to DockerHub
         run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
+      # 3. Construir y publicar imagen de backend
       - name: Build and push backend image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend-app ./backend
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend-app
 
+      # 4. Construir y publicar imagen de frontend
       - name: Build and push frontend image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app ./frontend
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app
 
+      # 5. Copiar docker-compose.yml al servidor EC2
+      - name: Copy docker-compose.yml to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          source: "docker-compose.yml"
+          target: "~/PR2"
+
+      # 6. Desplegar en EC2
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_KEY }}
+          envs: DB_HOST,DB_USER,DB_PASSWORD,DB_NAME,DB_PORT,DOCKERHUB_USERNAME
           script: |
             # Instalar docker-compose si no existe
             if ! command -v docker-compose &> /dev/null
@@ -39,23 +55,26 @@ jobs:
               sudo apt install -y docker-compose
             fi
 
-            # Descargar el repo en EC2 (solo para usar el docker-compose.yml)
-            rm -rf ~/PR2
-            git clone https://github.com/${GITHUB_REPOSITORY}.git ~/PR2
+            # Exportar variables desde secrets
+            export DB_HOST=${DB_HOST}
+            export DB_USER=${DB_USER}
+            export DB_PASSWORD=${DB_PASSWORD}
+            export DB_NAME=${DB_NAME}
+            export DB_PORT=${DB_PORT}
+            export DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME}
 
-            # Exportar variables desde Secrets
-            export DB_HOST=${{ secrets.DB_HOST }}
-            export DB_USER=${{ secrets.DB_USER }}
-            export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-            export DB_NAME=${{ secrets.DB_NAME }}
-            export DB_PORT=${{ secrets.DB_PORT }}
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-
-            # Ir al repo y desplegar con el docker-compose del repo
+            # Ir al directorio de despliegue
             cd ~/PR2
+
+            # Detener y limpiar contenedores previos
             sudo docker-compose down --rmi all --volumes --remove-orphans || true
+
+            # Descargar imágenes actualizadas desde DockerHub
             sudo docker-compose pull
+
+            # Levantar los nuevos contenedores
             sudo docker-compose up -d
+
 
 
 
