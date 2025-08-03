@@ -1,25 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Chiste</title>
+  <meta charset="UTF-8">
+  <title>Chiste de Programación</title>
 </head>
 <body>
   <h1>😂 Tu chiste de programación</h1>
   <p id="joke">Cargando chiste...</p>
-  <button onclick="window.location.href='index.html'">⬅ Volver</button>
 
   <script>
-    const API_URL = "http://54.172.213.164:8080";
-
-    async function fetchJoke() {
-      const res = await fetch(`${API_URL}/api/joke`);
-      const jokeData = await res.json();
-      document.getElementById("joke").innerText = jokeData.joke;
-    }
-
-    fetchJoke();
+    fetch('http://54.172.213.164:8080/api/joke')
+      .then(response => response.json())
+      .then(data => {
+        document.getElementById('joke').innerText =
+          data.type === 'single'
+            ? data.joke
+            : `${data.setup}\n\n${data.delivery}`;
+      })
+      .catch(err => {
+        document.getElementById('joke').innerText = 'Error al obtener el chiste';
+      });
   </script>
 </body>
 </html>
