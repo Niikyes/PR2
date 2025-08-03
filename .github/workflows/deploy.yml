@@ -2,40 +2,36 @@ name: CI/CD to EC2
 
 on:
   push:
-    branches: ["test"]  # Se ejecuta solo en la rama test
+    branches: ["test"]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      #Descargar el código del repositorio
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      #Loguearse en DockerHub
       - name: Log in to DockerHub
         run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-      #Construir y subir imagen backend
       - name: Build and push backend image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend-app ./backend
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend-app
 
-      #Construir y subir imagen frontend
       - name: Build and push frontend image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app ./frontend
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app
 
-      #Conectarse a EC2, generar docker-compose.yml y desplegar
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.10
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_KEY }}
+          envs: DOCKERHUB_USERNAME,DB_HOST,DB_USER,DB_PASSWORD,DB_NAME,DB_PORT
           script: |
             # Instalar docker-compose si no existe
             if ! command -v docker-compose &> /dev/null
@@ -46,23 +42,26 @@ jobs:
 
             mkdir -p ~/PR2
 
-            # Crear docker-compose.yml directamente con secrets
+            # Eliminar contenedores e imágenes viejas
+            sudo docker-compose -f ~/PR2/docker-compose.yml down --rmi all --volumes --remove-orphans || true
+
+            # Crear docker-compose.yml actualizado
             cat > ~/PR2/docker-compose.yml <<EOF
             version: '3.8'
             services:
               backend:
-                image: ${{ secrets.DOCKERHUB_USERNAME }}/backend-app:latest
+                image: ${DOCKERHUB_USERNAME}/backend-app:latest
                 container_name: backend_app
                 ports:
                   - "8080:8080"
                 environment:
-                  - DB_HOST=${{ secrets.DB_HOST }}
-                  - DB_USER=${{ secrets.DB_USER }}
-                  - DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-                  - DB_NAME=${{ secrets.DB_NAME }}
-                  - DB_PORT=${{ secrets.DB_PORT }}
+                  - DB_HOST=${DB_HOST}
+                  - DB_USER=${DB_USER}
+                  - DB_PASSWORD=${DB_PASSWORD}
+                  - DB_NAME=${DB_NAME}
+                  - DB_PORT=${DB_PORT}
               frontend:
-                image: ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app:latest
+                image: ${DOCKERHUB_USERNAME}/frontend-app:latest
                 container_name: frontend_app
                 ports:
                   - "80:80"
@@ -72,6 +71,4 @@ jobs:
             sudo docker-compose pull
             sudo docker-compose up -d
 
-            # Verificar contenedores en ejecución
-            sudo docker ps
 
