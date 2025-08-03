@@ -32,6 +32,35 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_KEY }}
           script: |
+            # Instalar docker-compose si no existe
+            if ! command -v docker-compose &> /dev/null
+            then
+              sudo apt update
+              sudo apt install -y docker-compose
+            fi
+            
+            # Crear carpeta si no existe
+            mkdir -p ~/PR2
+
+            # Sincronizar docker-compose.yml desde GitHub
+            cat > ~/PR2/docker-compose.yml <<'EOF'
+            version: '3.8'
+            services:
+              backend:
+                image: ${{ secrets.DOCKERHUB_USERNAME }}/backend-app:latest
+                container_name: backend_app
+                ports:
+                  - "8080:8080"
+                env_file:
+                  - ./backend/.env
+              frontend:
+                image: ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app:latest
+                container_name: frontend_app
+                ports:
+                  - "80:80"
+            EOF
+
             cd ~/PR2
             sudo docker-compose pull
             sudo docker-compose up -d
+
