@@ -1,0 +1,37 @@
+name: CI/CD to EC2
+
+on:
+  push:
+    branches: ["test"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Log in to DockerHub
+        run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Build and push backend image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend-app ./backend
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend-app
+
+      - name: Build and push frontend image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app ./frontend
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            cd ~/PR2
+            sudo docker-compose pull
+            sudo docker-compose up -d
