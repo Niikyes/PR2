@@ -38,23 +38,26 @@ jobs:
               sudo apt update
               sudo apt install -y docker-compose
             fi
-            
-            # Crear carpeta si no existe
+
             mkdir -p ~/PR2
 
-            # Sincronizar docker-compose.yml desde GitHub
-            cat > ~/PR2/docker-compose.yml <<'EOF'
+            # Crear docker-compose.yml directamente con secrets
+            cat > ~/PR2/docker-compose.yml <<EOF
             version: '3.8'
             services:
               backend:
-                image: ${{ secrets.DOCKERHUB_USERNAME }}/backend-app:latest
+                image: ${DOCKERHUB_USERNAME}/backend-app:latest
                 container_name: backend_app
                 ports:
                   - "8080:8080"
-                env_file:
-                  - ./backend/.env
+                environment:
+                  - DB_HOST=${{ secrets.DB_HOST }}
+                  - DB_USER=${{ secrets.DB_USER }}
+                  - DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+                  - DB_NAME=${{ secrets.DB_NAME }}
+                  - DB_PORT=${{ secrets.DB_PORT }}
               frontend:
-                image: ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app:latest
+                image: ${DOCKERHUB_USERNAME}/frontend-app:latest
                 container_name: frontend_app
                 ports:
                   - "80:80"

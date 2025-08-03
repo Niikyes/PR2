@@ -1,16 +1,22 @@
 version: '3.8'
+
 services:
   backend:
-    build: ./backend
+    image: ${DOCKERHUB_USERNAME}/backend-app:latest
     container_name: backend_app
     ports:
       - "8080:8080"
-    env_file:
-      - ./backend/.env
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_PORT=${DB_PORT}
 
   frontend:
-    build: ./frontend
+    image: ${DOCKERHUB_USERNAME}/frontend-app:latest
     container_name: frontend_app
     ports:
       - "80:80"
+
 
