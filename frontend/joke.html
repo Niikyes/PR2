@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chiste</title>
+</head>
+<body>
+  <h1>😂 Tu chiste de programación</h1>
+  <p id="joke">Cargando chiste...</p>
+  <button onclick="window.location.href='index.html'">⬅ Volver</button>
+
+  <script>
+    const API_URL = "http://54.172.213.164:8080";
+
+    async function fetchJoke() {
+      const res = await fetch(`${API_URL}/api/joke`);
+      const jokeData = await res.json();
+      document.getElementById("joke").innerText = jokeData.joke;
+    }
+
+    fetchJoke();
+  </script>
+</body>
+</html>
