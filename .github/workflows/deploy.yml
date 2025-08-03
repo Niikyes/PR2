@@ -2,22 +2,19 @@ name: CI/CD to EC2
 
 on:
   push:
-    branches: ["test1"]
+    branches: ["test1"] 
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout del repositorio
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      # 2️⃣ Login en DockerHub
       - name: Log in to DockerHub
         run: echo "${{ secrets.DOCKERHUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-      # 3️⃣ Build y push de imágenes
       - name: Build and push backend image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend-app ./backend
@@ -28,7 +25,6 @@ jobs:
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app ./frontend
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend-app
 
-      # 4️⃣ Generar archivo .env localmente
       - name: Generate .env file
         run: |
           echo "DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}" > .env
@@ -38,30 +34,18 @@ jobs:
           echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
           echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
 
-      # 5️⃣ Subir el archivo .env a EC2
-      - name: Upload .env to EC2
+      - name: Upload docker-compose.yml and .env to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_KEY }}
-          source: ".env"
+          source: |
+            docker-compose.yml
+            .env
           target: "/home/ubuntu/PR2/"
           overwrite: true
-          
-      - name: Verificar .env generado
-        run: cat .env
 
-      - name: Verificar archivos en EC2
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            ls -l /home/ubuntu/PR2
-
-      # 6️⃣ Desplegar en EC2
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.10
         with:
@@ -69,18 +53,18 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_KEY }}
           script: |
+            cd /home/ubuntu/PR2
             if ! command -v docker-compose &> /dev/null; then
               sudo apt update
               sudo apt install -y docker-compose
             fi
 
-            if [ ! -f /home/ubuntu/PR2/.env ]; then
-              echo "ERROR: .env no encontrado en /home/ubuntu/PR2"
+            if [ ! -f .env ]; then
+              echo "ERROR: .env no encontrado"
               exit 1
             fi
 
-            cd ~/PR2
-            sudo docker-compose down --rmi all --volumes --remove-orphans || true
+            sudo docker-compose --env-file .env down --rmi all --volumes --remove-orphans || true
             sudo docker-compose --env-file .env pull
             sudo docker-compose --env-file .env up -d
 
